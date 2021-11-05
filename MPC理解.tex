@@ -1,0 +1,410 @@
+\documentclass[UTF8]{ctexart}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{verbatim}%注释多行
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage[format=hang,font=small,textfont=it]{caption}
+\usepackage[nottoc]{tocbibind}
+\usepackage{latexsym}
+\usepackage{mathtools}
+\usepackage{pstricks-add}
+\usepackage{url}
+\usepackage[colorlinks, linkcolor=blue, anchorcolor=blue, citecolor=blue]{hyperref}%引用参考文献、章节、图表，并跳转
+\usepackage[all,pdf]{xy}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{framed}%文字带边框
+\usepackage{arydshln}%矩阵竖虚线
+\usepackage{mathdots}
+\usepackage{nicematrix}%分块矩阵
+\usepackage{tikz}
+\usepackage[thmmarks]{ntheorem}
+{
+	\theoremstyle{nonumberplain}
+	\theoremheaderfont{\bfseries}
+	\theorembodyfont{\normalfont}
+	\theoremsymbol{\mbos{$\Box$}}
+	\newtheorem{proof}{proof}
+}
+\usepackage{theorem}
+\usepackage{enumitem}
+\usepackage{rotating}
+%\usepackage{euscript}
+
+\geometry{a4paper,centering,scale=0.8}
+
+\title{\heiti MPC理解}
+\author{\kaishu 张聪 }
+\date{\today}
+%\theoremstyle{changebreak}
+\theoremstyle{plain}
+%\theoremheaderfont{\sffamily\bfseries}
+%\theorembodyfont{\normalfont}
+\bibliographystyle{alpha}
+\newtheorem{definition}{定义}
+\newtheorem{thm}{定理}
+\newtheorem{lemma}{引理}
+\newtheorem{construction}{构造}
+\newenvironment{myquote}
+{\begin{quote}\kaishu\zihao{-5}}
+	{\end{quote}}
+\newcommand\degree{^\circ}
+
+\begin{document}
+	
+	\maketitle
+	%\begin{abstract}
+	%这是摘要
+	%\end{abstract}
+	%\begin{center}
+	%信息工程研究所  \qquad 导师：林东岱
+	%\end{center}
+	%\tableofcontents
+	
+	%\clearpage
+	\zihao{-4}
+	%\section{半诚实模型}
+
+	
+%提纲：1MPC的方法，考虑GC和GMW，BGV，BMR/CCD，性质。布尔电路，算数电路。
+%2.安全性模型
+%3.如何做乘法。HE，OT。beaver triple， double sharing
+
+\section{MPC的主要方法}
+
+目前MPC的主要方法有：Garbled Circuit \cite{DBLP:conf/focs/Yao86}，GMW \cite{DBLP:conf/stoc/GoldreichMW87}，BGW \cite{DBLP:conf/stoc/Ben-OrGW88}，BMR \cite{DBLP:conf/stoc/BeaverMR90}。下面分别介绍。
+
+\begin{itemize}
+\item GC: 最早由 \cite{DBLP:conf/focs/Yao86}提出，其特点是轮数为常数，通信量大，且只能用于两方计算。推荐阅读\cite{DBLP:journals/eccc/ECCC-TR04-063}作为GC协议的入门。由于GC最初是作为一个协议提出的，\cite{DBLP:conf/ccs/BellareHR12}将GC作为一个密码学组件进行了抽象，将GC方案分为$(\mathsf{Garble},\mathsf{Encode},\mathsf{Eval},\mathsf{Decode})$几个算法，并定义了Privacy，Obliviousness，Authenticity。
+
+值得注意的是，GC天然地只适用于布尔电路，即每条线只有0/1两个值，如果平凡地推广到算数电路$\mathbb{F}_p$上，那么garbled table则有$p^2$行，当$p$很大时，这是不可接受的。\cite{DBLP:conf/focs/ApplebaumIK11}最早考虑了garble算数电路的情况，其思路是对输入进行编码，本质上还是布尔电路，后来\cite{DBLP:conf/ccs/BallMR16}则第一次考虑了推广GC到算数电路的情况，每条线有$p$个label，借鉴半门的思想，每个乘法门可以降低到$2p$条密文。后续发展有\cite{DBLP:conf/asiacrypt/Ben-Efraim18,DBLP:journals/iacr/BallCMRS19,DBLP:journals/iacr/MakriW19}。
+\begin{itemize}
+\item 半诚实情况：作为GC后续发展，相继提出了点置换技术(point-and-permute) \cite{DBLP:conf/stoc/BeaverMR90}，Free-XOR技术 \cite{DBLP:conf/icalp/KolesnikovS08}，行约减技术(grable row reduction,GRR)\cite{DBLP:conf/sigecom/NaorPS99,DBLP:conf/asiacrypt/PinkasSSW09}，半门技术(half-gate) \cite{DBLP:conf/eurocrypt/ZahurRE15}，分片切割技术(slicing-and-dicing) \cite{DBLP:conf/crypto/RosulekR21}.其中state-of-the-art是\cite{DBLP:conf/crypto/RosulekR21}，可以做到每个AND门通信量$1.5\kappa+5$比特，同时与FreeXOR兼容。
+\item 恶意情况：值得注意的是，最初的GC协议其实对malicious的evaluator也是安全的。{\red{我理解主要是因为GC协议给garbler的“权利”太大，garbler可以完全主导GC的生成，因此即使他想生成一个错误的电路，evaluator也没办法察觉。而evaluator能做的仅仅是拿到label之后本地求值，无法搞什么恶意破坏。因此恶意GC主要就是要防止恶意的garbler。}}
+
+我所接触的最早文章是Lindell和Pinkas的\cite{DBLP:conf/eurocrypt/LindellP07}，其主要思想是使用cut-and-choose方法，即让garbler一次性生成多个GC，然后让evaluator随机选择一些打开验证是否是正确的电路。其后续发展有\cite{DBLP:conf/tcc/LindellP11,DBLP:conf/crypto/Lindell13,DBLP:conf/crypto/LindellR14,DBLP:conf/ccs/LindellR15,DBLP:conf/uss/RindalR16,DBLP:conf/eurocrypt/WangMK17}，其主要思路都是类似的，区别在于具体如何提高效率，减少多余电路的传输，减少公钥操作的使用，batch和online/offline的优化等。可以参考我之前的MPC总结。
+
+另外一种思路是由Xiao Wang等人\cite{DBLP:conf/ccs/WangRK17}提出的认证garble思路。该协议的主要思路是，其实我们只需要保证garbler生成GC是诚实生成的就好了，进一步来说，由于FreeXOR，因此只需要保证AND门的garbled table是诚实生成的就行了，也就是AND门的真值表要是真实的。又由于garbled table的排列和置换比特相关，要想不让garbler捣乱，需要对这个置换比特做认证，即做一次信息论MAC。使得AND门的置换比特是两方的分享，而不是完全由garbler控制，且evaluator有MAC密钥可以验证正确性。此外这里面还用到一个思想是信息论MAC里有一个全局密钥$\Delta$，而这个$\Delta$恰好可以用作FreeXOR里的全局差分，这样生成的GC其实也是一个两方分享的形式，garbler失去了对GC完全的控制权。后续的发展有\cite{DBLP:conf/crypto/KatzRR018}，主要把half-gate的思路用到了认证GC上，降低通信。
+\end{itemize}
+\item GMW：最早由\cite{DBLP:conf/stoc/GoldreichMW87}提出，其特点是通信轮数与电路深度成正比，但通信量低。如果GC是最早的两方解决方案，那么GMW可以看成是最早的多方解决方案。他们的思路完全不同。GMW的主要思路是各方将自己的输入进行加法秘密分享，即$x=x_1+\dots+ x_n$（这里可以是布尔值也可以是算数值），然后对于加法门，各方直接本地把分享加起来即可，对于乘法门，则主要有两种方法进行计算：OT/OLE，HE。如果考虑offline情况，可以使用Beaver triple。最早的GMW协议考虑的是布尔电路，他们用的4选1OT来做乘法，具体可参考Goldreich的书 \cite{DBLP:books/cu/Goldreich2004}。
+\begin{itemize}
+\item 半诚实情况：据我所知似乎没有改进半诚实协议的文章，现在最快的半诚实GMW协议依然是最初的版本\cite{DBLP:conf/stoc/GoldreichMW87}。
+
+\item 恶意情况：恶意版本的GMW在最初的文章\cite{DBLP:conf/stoc/GoldreichMW87}就已经提出了，即GMW通用编译器，其主要思路是对每一条发出的消息都进行一次零知识证明，证明这条消息是按照协议规范计算的。其优点是对任何协议都通用，缺点则是效率非常低。后面的主要发展主要有\cite{DBLP:conf/eurocrypt/BendlinDOZ11,DBLP:conf/crypto/DamgardPSZ12}，后者就是著名的SPDZ协议。其主要思想是各方使用信息论MAC对每条线上的秘密分享做认证，在输出打开之前先验证MAC，验证通过了再输出。区别在于BDOZ式认证中，对每条线上的真值的每一对分享进行两两认证(即每对$P_i$和$P_j$的秘密均进行认证)，而SPDZ式认证是每方有一个全局密钥的分享和每一条线上真值的MAC的分享。这两篇文章生成认证MAC的方式都是使用半同态加密，而\cite{DBLP:conf/crypto/NielsenNOB12}和\cite{DBLP:conf/ccs/KellerOS16}使用OT代替半同态加密构造认证MAC，分别拓展了BDOZ和SPDZ式认证。其中使用OT构造BDOZ式认证的方法也称为TinyOT协议，关于TinyOT的详细脉络可以参考\cite{DBLP:journals/iacr/BurraLNNOOSS15}(TinyOT除了在这里有用之外，在Xiao Wang的一系列多方恶意GC协议的构造中也大有用途)。而SPDZ后面也有很多发展，有\cite{DBLP:conf/esorics/DamgardKLPSS13,DBLP:conf/ccs/KellerOS16,DBLP:conf/crypto/CramerDESX18,DBLP:conf/eurocrypt/KellerPR18,DBLP:conf/ccs/KellerOS16,DBLP:conf/ccs/Keller20}，这方面的文章我看的不多，就不做过多描述了。
+\end{itemize}
+\item BGW：最早由\cite{DBLP:conf/stoc/Ben-OrGW88}提出，其特点是通信轮数与电路深度成正比，通信量低。{\red{这里BGW和GMW最大的区别是，GMW使用加法分享，而BGW使用Shamir分享。在我看来，加法分享可以看成特殊的门限分享，即$(n-1,n)$分享，因此GMW可以允许dishonest majority，即使敌手corrupt了$n-1$个人，依然无法得到诚实方的输入。而BGW使用的Shamir秘密分享的corrupt门限为半诚实$t<\frac{n}{2}$，恶意$t<\frac{n}{3}$，即honest majority。虽然BGW可抵抗的敌手人数降低了，但BGW可以实现信息论安全，而GMW只能实现计算安全 (这里的理解是由于$t<\frac{n}{2}$，各方要做乘法可以直接将秘密分享本地做乘法，得到$2t$的秘密分享，接下来再经过一个次数约减步骤，将这个$2t$次分享降为$t$次分享，这个步骤是可以直接再使用秘密分享来做，不需要任何假设。而GMW无法这么做，必须使用如OT，HE等计算组件来完成，因此是计算安全的)，且BGW协议可以保证输出呈递性(Guaranteed Output Delivery,GOD)或公平性(fairness)，而GMW只能保证可终止安全性(security with abort)。这里可以理解为安全性的一个trade-off，能抵抗的敌手能力越强，则能抵抗的敌手数量越少。}}关于BGW协议的一个全面描述与安全证明，推荐阅读\cite{DBLP:journals/joc/AsharovL17}。\\
+值得一提的是BGW协议可以进一步推广到一般的线性秘密分享方案(Linear Secret Sharing Scheme,LSSS)\cite{DBLP:conf/eurocrypt/CramerDM00}，该文章定义了可乘性(multiplicative)与一般的敌手结构(adversary structure)，考虑在更一般的情况下如何用一个抽象的秘密分享方案构造MPC。这篇文章比较抽象，我了解的不多。但是这里的抽象给出了使用别的秘密分享方案的可能，其中一个比较著名的秘密分享就是重复秘密分享(Replicated Secret Sharing,RSS)\cite{DBLP:conf/tcc/CramerDI05}，这篇文章考虑了用RSS构造MPC，并且给出了用RSS转化成Shamir秘密分享的方法，即伪随机秘密分享(PRSS)。后面我会描述。一般提到BGW协议还是默认使用Shamir秘密分享。
+\begin{itemize}
+\item 半诚实情况：在最初的BGW协议中，乘法协议是让各方将分享本地相乘之后执行一个次数约减子协议，这个次数约减子协议需要各方将自己的秘密分享再做一次秘密分享，因此通信复杂度为$O(n^2)$。随后\cite{DBLP:conf/crypto/DamgardN07}提出了新的乘法协议，其思路是选出一个代表方$P_{king}$收集各方随机化之后的$2t$分享，重构之后在用$t$次分享回去，这样通信复杂度就是$O(n)$，具体来说，每个乘法门需要通信$6$个有限域元素。目前最新的\cite{DBLP:conf/crypto/GoyalLOPS21}通过降低随机对的生成成本，将每个乘法门通信降低到了$4$个域元素。
+
+\item 恶意情况：最早的BGW就提出了恶意情况的协议，主要思路是使用可验证秘密分享(Verifiable Secret Sharing,VSS)，保证敌手无法分享错误的秘密，且将敌手门限降低到了$\frac{n}{3}$，由于Shamir分享可以看成RS编码，利用纠错码的性质，即使敌手搞破坏，诚实方也可以恢复出正确的输出。\cite{DBLP:conf/stoc/GenkinIPST14}发现很多半诚实乘法协议(如DN协议)其实在恶意敌手情况下，敌手除了可以做一种加法攻击外，也是安全的(secure up to an additive attack)，即敌手最多只能在乘法结果上多加上某个数，因此恶意安全的协议只需要在半诚实协议基础上，在最后结果被打开之前增加一步验证步骤即可。验证协议目前的发展主要有\cite{DBLP:conf/crypto/Ben-SassonFO12,DBLP:conf/ccs/LindellN17,DBLP:conf/eurocrypt/FurukawaLNW17,DBLP:conf/acns/NordholtV18,DBLP:conf/crypto/ChidaGHIKLN18,DBLP:conf/ccs/0001L19,DBLP:journals/iacr/GoyalS20,DBLP:conf/ccs/BoyleGIN19,DBLP:journals/iacr/BoyleGIN20}
+\end{itemize}
+\item BMR：最早由\cite{DBLP:conf/stoc/BeaverMR90}提出，其实就是GC的多方版本，因此其特点和GC是一样的，即常数轮，但通信量大。由于在两方GC协议中，garbler的权利是非常大的，因此想要推广到多方，谁来做garbler就成了一个问题。BMR的解决方法是，让所有参与方共同使用一个MPC协议来生成GC(分布式生成GC)，再指定一个求值者求值即可。BMR框架比较关键的就是如何设计分布式生成GC的子协议，可以参考\cite{DBLP:journals/ftsec/EvansKR18}这本书的3.5节了解。
+\begin{itemize}
+\item 半诚实情况：半诚实情况和GC的发展比较少，\cite{DBLP:conf/ccs/Ben-EfraimLO16,DBLP:conf/asiacrypt/Ben-EfraimLO17}将FreeXOR技术推广到多方GC中，且使用密钥同态PRF降低了渐进通信复杂度。
+\item 恶意情况：恶意情况的构造比较多，\cite{DBLP:conf/crypto/LindellPSY15,DBLP:conf/tcc/LindellSS16}分别使用SPDZ和SHE对每个garbled table做认证，\cite{DBLP:conf/asiacrypt/HazaySS17,DBLP:conf/ccs/WangRK17a,DBLP:conf/ccs/YangWZ20}则是使用TinyOT协议做认证，目前state-of-the-art是\cite{DBLP:conf/ccs/YangWZ20}的结果，将半门的思想用在了多方GC中，且改进了TinyOT的生成效率。
+\end{itemize}
+
+\end{itemize}
+
+\subsection{安全定义}
+
+目前MPC的安全性根据不同的场景有很多种分类方式，大致有下面几种：
+\begin{itemize}
+\item 按照敌手行为划分：
+\begin{itemize}
+\item 半诚实/被动(semi-honest/passive)，即敌手按照协议规定执行，想从协议的执行副本中获得额外的信息
+\item 恶意/主动(malicious/active)，即敌手可以任意偏离协议规范执行。
+\item 隐蔽(covert)：由\cite{DBLP:conf/tcc/AumannL07}最早提出，即敌手表现为恶意时有一定的概率$\epsilon$被诚实方发现，这里$\epsilon$被称为威慑因子(deterrence factor)。{\red{当威慑因子为overwhelming时，covert和malicious就是等价的}}。随后\cite{DBLP:conf/asiacrypt/AsharovO12}在此基础上提出了更高的安全性，称为公开可验证的隐蔽安全性(publicly verifiable covert, PVC)，表示敌手一旦被抓到作弊，诚实方可以生成一个证明$\pi$，可以证明敌手作弊，且可以由任何人公开验证。目前PVC的后续工作比较多，有\cite{DBLP:conf/asiacrypt/KolesnikovM15,DBLP:conf/eurocrypt/HongKKLW19,DBLP:conf/crypto/DamgardO020,DBLP:conf/eurocrypt/FaustHKS21,DBLP:journals/iacr/Scholl0S21}前两篇是提升效率，后几篇是通用编译器。
+\end{itemize}
+\item 按敌手计算能力划分：
+\begin{itemize}
+\item 信息论/完美/无条件安全(information theory/perfect/unconditionally security)，即模拟器的输出和真实的view同分布。
+\item 统计安全(statistical security)，即模拟器的输出和真实的view统计不可区分。
+\item 计算安全(computational security)，即模拟器的输出和真实的view计算不可区分。
+\end{itemize}
+\item 按敌手数量划分：
+\begin{itemize}
+\item 不诚实大多数（dishonest majority）：即敌手最多可以有$n-1$个。用$t$表示敌手数量，则$t<n$。目前基于GC，GMW，BMR框架的协议均满足这一点。{\red{两方协议一定是dishonest majority。}}
+\item 诚实大多数（honest majority），即敌手的数量不超过参与方总数的一半，$t<\frac{n}{2}$。主要在BGW框架下。有时为了达到更高的安全性或者效率会有$t<\frac{n}{3},t<(\frac{1}{2}-\epsilon)n$等情况。
+\end{itemize}
+\item 按敌手对输出的控制程度划分：
+\begin{itemize}
+\item 保证输出呈递性(guaranteed output delivery,GOD)，即敌手无法干扰诚实方得到正确的输出。这个性质是最强的，但并不总是能够保证，只有honest majority可以保证GOD \cite{DBLP:conf/crypto/GoyalSZ20}。
+\item 公平性(fairness)，即敌手要么和诚实方同时得到输出，要么同时终止。GOD可以推出fairness，但反之不成立。同样地，fairness也并不总是能够保证，例如永远无法实现公平的投币协议 \cite{DBLP:conf/stoc/Cleve86}。
+\item 可终止安全性(security with abort)，即敌手可以先得到输出，再由敌手决定是否让诚实方得到输出。这也是目前实际MPC构造中最常见的类别。可终止安全性又可以分为下面几类：
+\begin{itemize}
+\item Security with identifiable abort，即诚实方可以知道敌手身份。
+\item Security with unanimous abort，即诚实方可以检测到敌手但不知身份，敌手可以选择让所有诚实方同时终止或输出。
+\item Security with selective (non-unanimous) abort，即诚实方要么检测到作弊行为而终止要么输出，敌手可以选择让哪些诚实方输出，哪些诚实方终止。一般只说security with abort时默认指的就是这种情况。
+\end{itemize}
+\cite{DBLP:conf/eurocrypt/CohenGZ20}研究了广播轮数和这些可终止安全性之间的关系。
+\end{itemize}
+\item 按敌手确定时间划分：
+\begin{itemize}
+\item 静态(static)：即敌手在协议开始前就确定corrupt哪些party。目前绝大部分实用的MPC协议都是考虑静态敌手。
+\item 动态(adaptive)：即敌手可以在协议开始后再确定corrupt哪些party。这里corrupt party一旦被corrupt后就一直是corrupt party。根据敌手是否能读取corrupt方过去的view，又可以分为两类：
+\begin{itemize}
+\item No erasures model，即敌手在corrupt之后可以得到corrupt party的整个view，包括他的输入，随机带，收到的消息。\cite{DBLP:conf/stoc/CanettiFGN96,DBLP:journals/joc/Canetti00,DBLP:conf/stoc/CanettiLOS02}
+\item Erasures model，即允许corrupt party在被敌手corrupt时擦除一些数据。\cite{DBLP:conf/eurocrypt/BeaverH92,DBLP:conf/ctrsa/Lindell09a}
+\end{itemize}
+\item 移动(proactive/mobile)：即敌手可以只corrupt某个party一段时间，也就是说，honest party可能变成corrupt party，而corrupt party也可能变成honest party。\cite{DBLP:conf/podc/OstrovskyY91,DBLP:conf/crypto/CanettiH94}
+\end{itemize}
+\end{itemize}
+
+\section{半诚实乘法协议总结}
+由上个部分可以看到，在GC框架下的协议有FreeXOR，因此布尔域上的加法是不需要通信的，唯一需要通信的就是AND门，即乘法。而GMW和BGW均使用秘密分享，对加法门来说也只需要各方自己本地计算输入分享的加法即可，需要通信的也只有乘法门。{\red{因此，MPC发展的本质就是如何更好地做乘法。}}下面总结一下目前我所知道的做乘法的方法，这里只考虑半诚实协议，不考虑恶意，因为半诚实情况下的思路更直接，就是纯粹只做乘法，而恶意协议一般是考虑怎么加入一些验证步骤防止敌手作弊。这里不考虑验证。后面我会再考虑总结一下目前已有的乘法验证协议。
+\subsection{重复秘密分享}
+在介绍乘法协议之前，先介绍一下重复秘密分享(Replicated Secret Sharing,RSS)，这种分享的特点是每个人拿到的秘密分片是指数大小($C_{n-1}^t$个)，但好处是可以不需要交互地转化成Shamir秘密分享，且用来做乘法只需要通信一个元素。
+
+RSS方案也是一个门限方案，设$(n,t)$-RSS方案表示$n$方分享的$t+1$门限方案，即$t$个人无法恢复秘密，$t+1$个人才可以恢复秘密。RSS的思路是把秘密写成加法分享，分成$C_n^t$项，每一项的下标就是$C_n^t$中的一种组合，然后每个人$P_i$拿下标为自己不属于那个组合的分片，即每人拿$C_{n-1}^t$个项。此时任意$t$个人无法恢复秘密，因为他们拿到的项一定会差一个下标为这$t$个人的项。
+
+这里举一个例子($n=5,t=2$)：要分享秘密$x$，先写成加法形式，
+\begin{align*}
+x=x_{12}+x_{13}+x_{14}+x_{15}+x_{23}+x_{24}+x_{25}+x_{34}+x_{35}+x_{45}
+\end{align*}
+秘密分享如下：
+\begin{align*}
+P_1:x_{23},x_{24},x_{25},x_{34},x_{35},x_{45}\\
+P_2:x_{13},x_{14},x_{15},x_{34},x_{35},x_{45}\\
+P_3:x_{12},x_{14},x_{15},x_{24},x_{25},x_{45}\\
+P_4:x_{12},x_{13},x_{15},x_{23},x_{25},x_{35}\\
+P_5:x_{12},x_{13},x_{14},x_{23},x_{24},x_{34}
+\end{align*}
+可以看到，让每个$P_i$拿到的是下标里不含$i$的那些项，此时如果想要恢复秘密，需要至少$3$个人合作，因为任意两个人$P_i,P_j$拥有的项一定不包括$x_{ij}$，所以无法恢复秘密。
+
+注：有的RSS方案会描述为秘密的下标是上述的补集，即$C_{n}^{n-t}$中的组合，此时$P_i$拿到的项就是下标包含$i$的项。任意$t$方依然无法恢复秘密，这是因为他们一定缺少一项下标为他们之外$n-t$个人的那一项。由$C_n^t=C_n^{n-t}$，这两种方案是一样的，只是看待的角度不同。
+\subsubsection{分享转换，伪随机秘密分享}
+当各方拥有RSS时，可以通过本地直接转换成Shamir秘密分享。设$(n,t)$-RSS方案为
+\begin{align*}
+x=\sum_{A\subset [n]:|A|=t}x_A
+\end{align*}
+想要将$x$转换为$(n,t)-$Shamir分享，考虑对每个$A\subset [n],|A|=t$构造$t$次多项式$f_A$，满足\begin{enumerate}\item $f_A(0)=1$,\item $f_A(i)=0$ for $i\in A$\end{enumerate}
+此时每一方$P_j$计算自己的分享为
+\begin{align*}
+x_j=\sum_{A\subset [n]:|A|=t,j\notin A}x_A\cdot f_A(j)
+\end{align*}
+这些$\{x_j\}_{j\in [n]}$构成了$(n,t)-$Shamir分享。这是因为，考虑$t$次多项式\begin{align*}
+f=\sum_{A\subset [n]:|A|=t}x_A\cdot f_A
+\end{align*}
+则$f(j)=x_j$且$f(0)=\sum_A x_A=x$
+
+上述方法只能将一个RSS转换成一个Shamir秘密分享。一个观察是，当秘密$x$是随机的时候，所有的RSS分片$x_A$是独立随机的。此时可以将$x_A$作为伪随机函数$\psi(\cdot)$的密钥，只要各方对一个常数$a$达成共识，则可以直接用$\psi_{x_A}(a)$代替$x_A$构造Shamir分享，即：
+\begin{align*}
+x_j=\sum_{A\subset [n]:|A|=t,j\notin A}\psi_{x_A}(a)\cdot f_A(j)
+\end{align*}
+这样，只要各方有了一个RSS，就可以本地计算无穷个随机Shamir秘密分享。需要注意的是这里的秘密分享其实和真正的Shamir分享不太一样，真正的Shamir分享的秘密分片是真随机的，这里的秘密分片是伪随机的(即，伪随机秘密分享，PRSS)，这会导致用这种方法得到的MPC不再是信息论安全，而是计算安全的了。
+\subsection{OT与OLE}
+\subsubsection{OT与OLE的关系}
+在讲乘法之前，再讲一下我对OT与OLE的关系的理解。OLE其实就是OT在算数域上的推广。在OT中，sender的输入是$(m_0,m_1)$，receiver输入$x\in \{0,1\}$，输出$m_x$。在OLE中，sender的输入是$(a,b)$，receiver输入$x\in \mathbb{F}$，输出$ax+b$，这里$\mathbb{F}$是一个有限域。从另一个角度看OT的输出，$m_x=m_0\oplus x\cdot(m_0\oplus m_1)$，如果我们转换一下sender的输入，令$a:=m_0\oplus m_1,b:=m_0$，此时OT的输出就是$ax\oplus b$，和OLE形式就一样了。
+\subsubsection{乘法分享协议}
+MPC里面我们最关注的就是如何把乘法转化成加法分享，即：sender输入一个$x\in \mathbb{F}$，receiver输入$y\in \mathbb{F}$，sender输出$m\in \mathbb{F}$，receiver输出$n\in \mathbb{F}$，满足$m+n=xy$。称这个协议为乘法分享协议(multiplication sharing, MS)。
+
+OT/OLE其实和乘法分享协议等价，即可以互相构造。这里以更一般的OLE为例：
+
+OLE $\rightarrow$ MS：\begin{enumerate}\item receiver随机选取$m$，令$a:=y, b:=-m$。\item 双方调用OLE，sender输入x，receiver输入$a,b$。sender得到$n = ax + b = yx - m$，满足$m + n = xy$。\end{enumerate}
+
+MS $\rightarrow$ OLE：\begin{enumerate}\item sender和receiver 对$a,x$调用MS得到$ax$的分享$m,n$，满足$ax = m + n$。\item sender将$c = b + m$ 发送给receiver。\item receiver计算$n + c =n+b+m= ax - m + b + m = ax + b$。\end{enumerate}
+
+\subsubsection{用同态加密做乘法分享}
+如果我们有同态加密，则可以非常简单地做乘法分享，协议如下：
+\begin{enumerate}
+\item sender生成HE的公私钥对$(pk,sk)$，计算$c=Enc_{pk}(x)$发给receiver。
+\item receiver随机选一个$r$，利用同态性质，计算$y\cdot c+r =Enc_{pk}(xy+r)$发回sender。
+\item sender解密得到$xy+r$作为自己的分享，receiver令$-r$作为自己的分享。
+\end{enumerate}
+\subsection{GMW乘法协议}
+GMW中各方有加法分享。设参与方有$n$个，分别为$P_1,\dots, P_n$。电路中每条线上的真值为$x$，则每方有一个加法分享，即$P_i$有$x_i$，满足$x=x_1+\dots + x_n$。一般用$[x],[y],[z]$表示加法分享，即$[x]=(x_1,\dots,x_n)$满足$x_1+\dots +x_n = x$。乘法协议是指各方持有乘法门的输入分享，想求乘法门的输出分享，即各方持有$[x],[y]$，想求$[z]=[xy]$。
+\subsubsection{两方情况}
+这里先介绍两方布尔情况，即$P_1$有$x_1,y_1$，$P_2$有$x_2,y_2$，双方想求$z_1,z_2$满足$z_1\oplus z_2 = (x_1\oplus x_2)\cdot(y_1\oplus y_2)$。一个思想是使用上一节的MS协议。等式右边展开有$x_1y_1\oplus x_1y_2\oplus x_2y_1\oplus x_2y_2$，这里$x_1y_1,x_2y_2$可以分别由$P_1$和$P_2$本地计算，而交叉项$x_1y_2$和$x_2y_1$恰好可以用上一节的MS协议来得到加法分享。协议如下：
+\begin{enumerate}
+\item $P_1$用$x_1,y_1$和$P_2$用$y_2,y_1$调用两次MS协议。$P_1$得$m_1,m_2$，$P_2$得$n_1,n_2$，满足$m_1\oplus n_1=x_1y_2$，$m_2\oplus n_2 =x_2y_1 $
+\item $P_1$令$z_1:=x_1y_1\oplus m_1\oplus m_2$，$P_2$令$z_2:=x_2y_2\oplus n_1\oplus n_2$。则$z_1\oplus z_2 = x_1y_1\oplus m_1\oplus m_2\oplus x_2y_2\oplus n_1\oplus n_2 = x_1y_1\oplus x_1y_2\oplus x_2y_1\oplus x_2y_2=(x_1\oplus x_2)\cdot(y_1\oplus y_2)$。
+\end{enumerate}
+
+
+另外一种思路是不展开，既然是在布尔域上，虽然$P_1$不知道$P_2$的输入，但是可以直接遍历，总共就4种情况，因此可以直接调用一次四选一OT来实现。协议如下：
+\begin{enumerate}
+\item $P_1$选一个随机比特$r\leftarrow \{0,1\}$。
+\item $P_1$和$P_2$调用一次四选一OT，$P_1$作为sender，输入是$(x_1y_1\oplus r,x_1\cdot(y_1\oplus1)\oplus r,(x_1\oplus 1)\cdot y_1\oplus r,(x_1\oplus 1)\cdot(y_1\oplus 1)\oplus r)$，$P_2$作为receiver，输入$2x_2+ y_2+1$(即$x_2y_2$对应的二进制数字)。$P_2$得到输出$(x_1\oplus x_2)\cdot(y_1\oplus y_2)\oplus r$。
+\item $P_1$令$z_1:=r$，$P_2$令$z_2:=(x_1\oplus x_2)\cdot(y_1\oplus y_2)\oplus r$。显然$z_1\oplus z_2 = (x_1\oplus x_2)\cdot(y_1\oplus y_2)$。
+\end{enumerate}
+
+上面协议中选$r$的作用是生成秘密分享，如果不加上$r$，会让$P_2$直接拿到乘法结果，而不是分享。
+
+上述两种协议如果推广到有限域$\mathbb{F}_p$上，第一个协议只需要把OT换成OLE即可，第二个协议则只需把四选一OT换成$2p$选一OT即可。
+\subsubsection{多方情况}
+多方情况的GMW可以转化为两方情况。在多方情况下，$P_i$有$x_i,y_i$，满足$\sum_{i\in [n]}x_i = x,\sum_{i\in [n]}y_i=y$，$P_i$想要得$z_i$满足$\sum_{i\in [n]}z_i=(\sum_{i\in [n]}x_i)(\sum_{i\in [n]}y_i)$。有如下观察：
+\begin{align*}
+(\sum_{i\in [n]}x_i)(\sum_{i\in [n]}y_i)&=\sum_{i\in[n]}x_iy_i+\sum_{1\leq i<j\leq n}(x_iy_j+x_jy_i)\\
+&=(1-(n-1))\cdot\sum_{i\in[n]}x_iy_i+\sum_{1\leq i<j\leq n}(x_i+x_j)\cdot(y_i+y_j)\\
+&=(2-n)\cdot\sum_{i\in[n]}x_iy_i+\sum_{1\leq i<j\leq n}(x_i+x_j)\cdot(y_i+y_j)
+\end{align*}
+可以看到，$(2-n)x_iy_i$可以由$P_i$本地计算，后面的项恰好对应于$P_i,P_j$的两方乘法协议。因此调用$C_n^2$次两方乘法协议即可。
+
+\subsection{BGW乘法协议}
+BGW协议和GMW不一样，使用的是Shamir分享，因此上面的方法不太适用。实际上BGW协议是无条件安全的，不需要OT或HE来计算，各方仅需通信即可完成乘法。
+
+设参与方有$n$个，分别为$P_1,\dots, P_n$。电路中每条线上的真值为$x$，则每方有一个Shamir分享，即$P_i$有$x_i$，满足存在一个$t$次多项式$f$，使得$f(i)=x_i$且$f(0)=x$。这里$t<\frac{n}{2}$表示敌手数量。一般用$\langle x\rangle_t,\langle y\rangle_t,\langle z\rangle_t$表示$t$次Shamir分享(门限为$t+1$)。乘法协议是指各方持有乘法门的输入分享，想求乘法门的输出分享，即各方持有$\langle x\rangle_t,\langle y\rangle_t$，想求$\langle z\rangle_t=\langle xy\rangle_t$。
+
+设分享$x$的多项式是$f$，分享$y$的多项式是$g$，即$x_i=f(i),x=f(0),y_i=g(i),y=g(0)$。Shamir分享的一个好处是，各方可以本地直接把自己的分享相乘，即$P_i$令$z_i:=x_iy_i$。可以发现$z_i = f(i)g(i)$，不妨设$h=fg$是$2t$次多项式，则显然$h(0)=f(0)g(0)=xy$。因此这里$z_i$是$xy$的$2t$次分享。这里有两个问题，首先，$z_i$其实不是标准的Shamir分享，因为标准的Shamir分享要求这个多项式是随机选取的，但是这里$h$是由两个$t$次多项式相乘得到的，也就是说，$h$一定是可约的，所以$h$可能会泄露一些秘密信息，需要随机化一下；二是$h$是一个$2t$次分享，需要把它降低成$t$次分享才可以。
+
+要解决第一个问题，思路是让各方分享一个$2t$次的0，所有人把各方的分享加起来，即可得到一个随机的$2t$次分享。要解决第二个问题，思路是将$h$截断，去掉$t$次以上的项。设$h(x)=\sum_{i\in[2t]}h_ix^i$，令$\hat{h}=\sum_{i\in [t]}h_ix^i$表示$h$去掉$t$次以上项的截断多项式，则$h(0)=\hat{h}(0)=xy$。剩下的问题就是在各方有$h(1),\dots,h(n)$的情况下，如何得到$\hat{h}(1),\dots,\hat{h}(n)$。实际上，这两组分享只相差一个线性关系，即$(\hat{h}(1),\dots,\hat{h}(n))^T=A\cdot (h(1),\dots,h(n))^T$。下面给出证明：
+
+令$\vec{h}=(h_0,h_1,\dots,h_t,\dots,h_{2t},0,\dots,0)\in \mathbb{F}^n$，令$V$表示$n$阶范德蒙矩阵，
+
+即 { $V=\left[ \begin{array}{cccc}
+	     1&1&\dots&1^{n-1}  \\
+	     1&2&\dots&2^{n-1}  \\
+	     \vdots&\vdots&&\vdots  \\
+	     1&n&\dots&n^{n-1}  
+		\end{array}
+		\right ]$}
+
+则$V\cdot \vec{h}^T=(h(1),\dots,h(n))^T$。由于$V$是可逆的，有$\vec{h}^T=V^{-1}\cdot (h(1),\dots,h(n))^T$
+
+同样地，令$\vec{\hat{h}}=(h_0,h_1,\dots,h_t,0,\dots,0)$，有$V\cdot \vec{\hat{h}}^T=(\hat{h}(1),\dots,\hat{h}(n))^T$
+
+令$T=\{1,\dots,t\}$，且令$P_T$表示对角线前$t$个位置为$1$，剩下位置为$0$的$n$阶矩阵，即$P_T(i,j)=1$当且仅当$i=j\in T$。则$P_T\cdot \vec{h}^T=\vec{\hat{h}}^T$。于是
+
+$(\hat{h}(1),\dots,\hat{h}(n))^T=V\cdot \vec{\hat{h}}^T=V\cdot P_T\cdot \vec{h}^T=V\cdot P_T\cdot V^{-1}\cdot (h(1),\dots,h(n))^T$
+
+即$A=V\cdot P_T\cdot V^{-1}$。证完。
+
+有了$(\hat{h}(1),\dots,\hat{h}(n))^T=A\cdot (h(1),\dots,h(n))^T$关系之后，可以发现，$2t$次分享和$t$次分享只相差一些线性运算，而线性运算可以在把输入分享之后，直接本地算。乘法就这样做完了。协议描述如下：
+
+\begin{enumerate}
+\item $P_i$计算$z_i'':=x_iy_i$。
+\item $P_i$随机选一个$2t$次多项式$q_i(x)$满足$q_i(0)=0$，将$s_{i,j}=q_i(j)$发给$P_j,j\ne i$。
+\item $P_i$收到$s_{1,i},\dots,s_{n,i}$，令$z_i':=z_i''+\sum_{j\in [n]}s_{j,i}$。
+\item 各方用$z_i'$作为输入，执行BGW协议，计算$A\cdot (z_1',\dots,z_n')=(z_1,\dots,z_n)$，$P_i$输出$z_i$。则$z_i$就是$xy$的$t$次秘密分享。
+\end{enumerate}
+
+这里第二第三步是重随机化，第四步是次数约减。
+
+其实还有另一种角度看待这个乘法协议。如何在次数约减这一步更直观地理解矩阵$A$呢？在Shamir分享中，要重构秘密，需要用到拉格朗日插值公式，即过$(1,x_1),\dots,(n,x_n)$的多项式$f(x)$可以写为：
+\begin{align*}
+f(x)=\sum_{i=1}^nx_i(\prod_{j\ne i}^{1\leq j\leq n}\frac{x-j}{i-j})
+\end{align*}有
+\begin{align*}
+x=f(0)=\sum_{i=1}^nx_i(\prod_{j\ne i}^{1\leq j\leq n}\frac{-j}{i-j})\text{，令}\lambda_i=\prod_{j\ne i}^{1\leq j\leq n}\frac{-j}{i-j}
+\end{align*}
+则$x=\sum_{i\in [n]} \lambda_ix_i$，因此Shamir分享的线性组合可以直接恢复秘密。那么当各方得到$xy$的$2t$次分享之后，各方可以直接把这个分享再用$t$次Shamir分享分享出去，然后各方用$\lambda_i$把收到的分享线性组合，就能得到$xy$的$t$次分享。这样看还有一个好处，就是因为各方使用了新的$t$次分享，此时各方得到的分享一定是随机的，所以重随机步骤可以不要了。重新描述协议如下：
+
+\begin{enumerate}
+\item $P_i$计算$z_i':=x_iy_i$。
+\item $P_i$把$z_i'$用Shamir分享出去，即随机选取$t$次多项式$u_i(x)$，满足$u_i(0)=z_i'$，将$v_{i,j}=u_i(j)$发给$P_j,j\ne i$。
+\item $P_i$收到$v_{1,i},\dots,v_{n,i}$，令$z_i:=\lambda_1 v_{1,i}+\dots +\lambda_nv_{n,i}$。由于$\{v_{i,j}\}_{j\in [n]}$是$z_{i}'$的$t$次Shamir分享，$\{z_i\}_{i\in [n]}$就是$\sum_{i\in [n]}\lambda_i z_i'=z=xy$的$t$次分享。这里$\lambda_i$是$2t$次插值多项式的拉格朗日系数。
+\end{enumerate}
+\subsubsection{重复秘密分享乘法协议}
+由于重复秘密分享RSS各方拥有的分享大小为指数$(C_{n-1}^t)$，因此不适用于$n$比较大的情况，一般具体考虑$n=3,4,5$的时候会使用这种秘密分享\cite{DBLP:conf/ccs/ArakiFLNO16,DBLP:conf/ccs/BoyleGIN19}，它的好处就是乘法的具体通信量很低，只需发送一个元素。这里以$n=3$为例。
+
+先回顾一下$(3,1)$-RSS方案，要分享$x$，令$x=x_1+x_2+x_3$，则$P_1$拿$x_2,x_3$，$P_2$拿$x_1,x_3$，$P_3$拿$x_1,x_2$（即$P_i$拿$x_{i-1}$和$x_{i+1}$，下标模3）。要计算乘法
+\begin{align*}
+xy&=(x_1+x_2+x_3)(y_1+y_2+y_3)\\
+&=x_1y_1+x_2y_2+x_3y_3+x_1y_2+x_1y_3+x_2y_1+x_2y_3+x_3y_1+x_3y_2\\
+&=\sum_{i\in [3]}(x_{i+1}y_{i+1}+x_{i+1}y_{i-1}+x_{i-1}y_{i+1}):=\sum_{i\in [3]}z_{i+1}
+\end{align*}
+可以看到，$P_i$可以直接本地直接算出$xy$的加法分享$z_{i+1}$。为了保持RSS的形式，$P_i$把$z_{i+1}$发给$P_{i-1}$，此时$P_i$就有了$z_{i+1},z_{i-1}$满足是$xy$的一个RSS。但是这里还有一个问题，就是$z_{i+1}$并不是随机的，它是由输入的一些乘积加起来得到的，也会出现像BGW中类似的问题，因此也需要重新随机化一下，即，让各方生成一个$0$的分享$\alpha_1+\alpha_2+\alpha_3=0$。然后把这个分享加上去，$z_{i+1}:=x_{i+1}y_{i+1}+x_{i+1}y_{i-1}+x_{i-1}y_{i+1}+\alpha_i$，即可。
+
+下面描述如何生成这样的0分享。其实很简单，只需要$P_i$随机选一个元素$\rho_i$发给$P_{i+1}$即可，然后$P_i$令$\alpha_i:=\rho_i-\rho_{i-1}$。容易验证，$\alpha_1+\alpha_2+\alpha_3=0$。为了大量生成这样的随机对，可以利用伪随机秘密分享PRSS类似的想法，把$\rho$作为PRF的密钥，即令$\alpha_i:=F_{\rho_{i-1}}(id)-F_{\rho_i}(id)$，这样就能本地计算无限多个0分享。代价是由无条件安全变成了计算安全。
+
+下面描述3方RSS乘法协议：
+\begin{enumerate}
+\item $P_i$计算$z_{i+1}:=x_{i+1}y_{i+1}+x_{i+1}y_{i-1}+x_{i-1}y_{i+1}+\alpha_i$。发给$P_{i-1}$。
+\item $P_i$从$P_{i+1}$收到$z_{i-1}$，令分享为$(z_{i-1},z_{i+1})$。
+\end{enumerate}
+可以看到，在setup生成0分享之后，每方只需发送一个元素即可计算乘法。
+\subsection{Offline乘法协议}
+如果在得到输入之前可以预先计算一些相关随机对，各方在得到输入之后就可以很快地计算乘法。目前这方面主要有两种方法：beaver triple和double sharing。其中beaver triple可以同时适用GMW和BGW协议，而double sharing只适用于BGW协议，即honest majority。
+\subsubsection{Beaver triple}
+Beaver triple\cite{DBLP:conf/crypto/Beaver91a}就是一个随机的乘法分享对$[a],[b],[c]$(对BGW就是$\langle a\rangle_t,\langle b\rangle_t,\langle c\rangle_t$)，其中$c=ab$。当有了beaver triple时，在线阶段的乘法就可以通过打开两次秘密完成，不需要额外的OT或者HE。相当于把乘法放到offline做了。这主要基于一个观察：
+\begin{align*}
+xy=(x-a+a)\cdot(y-b+b)=(x-a)(y-b)+a(y-b)+b(x-a)+ab
+\end{align*}
+在线阶段直接打开$\rho = x-a,\sigma=y-b$，则$[xy]=\rho\sigma+\sigma[a]+\rho[b]+[c]$。即$[a],[b],[c]$的线性计算，可以直接在本地完成。协议描述如下：
+\begin{enumerate}
+\item $P_i$计算$x_i-a_i,y_i-b_i$并发给所有人。
+\item 各方收到秘密后重构$\rho:=x-a,\sigma:=y-b$。
+\item $P_i$计算$z_i:=\rho\sigma+\sigma a_i+\rho b_i+c_i$。
+\end{enumerate}
+
+关于beaver triple的生成，其实和乘法协议是类似的，把输入换成了随机选取的即可。这里以两方布尔加法分享的beaver triple生成为例，协议如下：
+
+\begin{enumerate}
+\item $P_1$随机选$a_1\leftarrow \{0,1\}$作为输入，和$P_2$执行随机OT，$P_1$得到$m^2_{a_1}$，$P_2$得到$(m^2_0,m^2_1)$。
+\item $P_2$随机选$a_2\leftarrow \{0,1\}$作为输入，和$P_1$执行随机OT，$P_2$得到$m^1_{a_2}$，$P_1$得到$(m^1_0,m^1_1)$。
+\item $P_1$令$b_1:=m^1_0\oplus m^1_1$，$P_2$令$b_2:=m^2_0\oplus m^2_1$。
+\item $P_1$令$c_1:=a_1b_1\oplus m^2_{a_1}\oplus x_0^1$，$P_2$令$c_2:=a_2b_2\oplus m^1_{a_2}\oplus x_0^2$。
+\end{enumerate}
+容易验证，$c_1\oplus c_2 = (a_1\oplus a_2)(b_1\oplus b_2)$。类似的，也可以用HE做。
+
+关于BGW协议beaver triple的生成$\langle a\rangle_t,\langle b\rangle_t,\langle c\rangle_t$，思路是让各方先生成随机$t$分享$\langle a\rangle_t,\langle b\rangle_t$，然后执行一次乘法协议算$\langle c\rangle_t$即可。生成随机$t$分享目前主要有两种方法。一种基于伪随机秘密分享(psudorandom secret sharing,PRSS)\cite{DBLP:conf/tcc/CramerDI05}，该方法使各方能够生成伪随机元素的分享，而无需任何交互。主要使用的就是之前RSS转化成Shamir分享的思路。这种方法的问题是，每一方持有的密钥数量随着参与方的数量呈指数增长，这大大增加了生成分享的计算工作量。因此，只有当协议中的参与方数量较少时，这种方法才有效。具体协议描述如下：
+\begin{enumerate}
+\item (Setup) 对每个$A\subset [n],|A|=t$，对不在集合$A$中最小的那一方(即$P_i, i=min\{j\in [n]|j\notin A\}$)随机选择$k_A$，并发给其他所有不在$A$中的参与方(即$P_j,j\notin A$)。最后$P_i$就会得到所有$\{k_A|i\notin A\}$。
+\item (Upon request) 各方对每个$A\subset [n],|A|=t$构造$t$次多项式$f_A$，满足$f_A(0)=1$,$f_A(i)=0$ for $i\in A$。$P_i$令$r_i=\sum_{A\subset [n]:|A|=t,i\notin A}F_{k_A}(id)\cdot f_A(i)$。这里$id$是公开参数，每生成一次新的分享都要用一个新的$id$。
+\end{enumerate}
+
+一种是基于范德蒙矩阵\cite{DBLP:conf/crypto/DamgardN07}，该矩阵可用于从$n$个分享“提取随机性”到$t+1$个新分享。思路是是让每一方向其他方分享一个随机元素。然后，在持有$n$个分享向量时，各方将该大小为$n$的向量与$n-t$行$n$列的范德蒙矩阵相乘，得到$n-t$个“新”随机分享。通过随机性提取性质，我们得到新的分享是$\mathbb{F}$中随机元素的分享。由于$t<\frac{n}{2}$，各方得到至少$\frac{n}{2}+1$个分享。由于每方需要发送$n-1$个元素，平均每个随机分享通信约为$2$个元素。设{ $V_{n-t}=\left[ \begin{array}{cccc}
+	     1&1&\dots&1^{n-t-1}  \\
+	     1&2&\dots&2^{n-t-1}  \\
+	     \vdots&\vdots&&\vdots  \\
+	     1&n&\dots&n^{n-t-1}  
+		\end{array}
+		\right ]$}是一个$n\times (n-t)$的范德蒙矩阵，协议描述如下：
+\begin{enumerate}
+\item $P_i$随机选一个$u_i$并用$t$次Shamir分享把$u_i$分享出去，即$\langle u_i\rangle_t$。
+\item 各方本地计算$(\langle r_1\rangle_t,\dots,\langle r_{n-t}\rangle_t)^T:=V_{n-t}^T\cdot (\langle u_1\rangle_t,\dots,\langle u_n\rangle_t)^T$。
+\end{enumerate}
+这里我的理解是这样的，一般考虑生成一个随机分享，平凡的想法是让各方都随机分享一个值，最后把这$n$个值加起来。但是这样效率太慢了，$n$个人每个人分享一次才能得到一个随机分享。而又不能直接用每个人的分享，因为分享者知道秘密，所以就要考虑用一个随机提取器，从各方分享的秘密中尽可能多的提取出随机分享。那么能提取出多少随机分享呢，因为有$t$个坏人，所以可以认为坏人提供的分享不具有随机性，或者具有坏的随机性，那么好人的随机性就是$n-t$个。如何从这些好坏掺杂的分享中提取出真正的随机性呢？思路就是把所有分享乘固定系数加起来在一起，把好人的分享加到坏人的分享上，这样就能保证得到的新分享是之前分享的线性组合，坏人的坏随机性被好人真正的随机性吸收掉了(如$a$是随机的，则对任何$b$的分布，$a+b$也是随机的)。而不同的固定系数需要线性无关，才能保证生成的不同的分享也是独立的。考虑到好人提供的随机性至多$n-t$个，因此最多生成$n-t$个新的随机秘密分享。
+\subsubsection{Double sharing}
+Double sharing\cite{DBLP:conf/crypto/DamgardN07}是指同一个秘密的$t$次和$2t$次分享，即$(\langle r\rangle_t,\langle r\rangle_{2t})$。可以看到这种形式是专门针对honest majority的。使用double sharing的好处是可以将乘法协议的通信复杂度降到$O(n)$。注意到之前的协议，不管是GMW还是BGW，还是beaver triple，都需要每次乘法每个人向其他所有人发送消息，即总的通信复杂度为$O(n^2)$。
+
+使用double sharing的主要思想是选取某一方作为$P_{king}$，让大家先把自己的分享本地相乘，再减去$2t$次随机分享$r$，即$\langle x\rangle_t\cdot \langle y\rangle_t-\langle r\rangle_{2t}$，发给$P_{king}$。$P_{king}$重构出$xy-r$之后再发给各方，各方收到之后在加上$r$的$t$次分享，即$xy-r+\langle r \rangle_t$这样就得到了$xy$的$t$次分享$\langle xy\rangle_{t}$。设$\langle r\rangle_t$和$\langle r\rangle_{2t}$中各方的分享分别是$r^{t}_i$和$r^{2t}_i$。使用double sharing的乘法协议如下：
+\begin{enumerate}
+\item $P_i$计算$x_iy_i-r_i^{2t}$并发给$P_{king}$。
+\item $P_{king}$重构出$xy-r$，发给所有人。
+\item $P_i$令$z_i:=xy-r+r_i^t$。
+\end{enumerate}
+
+double sharing的生成和单个随机BGW分享$\langle r\rangle_t$的生成类似，也是使用范德蒙矩阵进行提取。这里不能使用PRSS的方法是因为我们需要同时生成同一个数的$t$和$2t$的分享，而PRSS中的门限和RSS的门限是一样的，这意味着要想生成$2t$次分享，还要再进行一个$2t$的setup，但是即使setup了之后，由于每次运行都是生成新的伪随机数的分享，无法保证和$t$门限时候的值一致。这里描述用范德蒙矩阵生成double sharing的协议如下：
+\begin{enumerate}
+\item $P_i$随机选一个$u_i$并同时用$t$次和$2t$次Shamir分享把$u_i$分享出去，即$\langle u_i\rangle_t,\langle u_i\rangle_{2t}$。
+\item 各方本地计算
+
+$(\langle r_1\rangle_t,\dots,\langle r_{t+1}\rangle_t)^T:=V_{t+1}^T\cdot (\langle u_1\rangle_t,\dots,\langle u_n\rangle_t)^T,$
+
+$(\langle r_1\rangle_{2t},\dots,\langle r_{t+1}\rangle_{2t})^T:=V_{t+1}^T\cdot (\langle u_1\rangle_{2t},\dots,\langle u_n\rangle_{2t})^T$
+\end{enumerate}
+\subsection{GC乘法协议}
+GC其实没有乘法协议，倒不如说，GC的生成本身就是一个非交互乘法协议，采用点置换技术，置换比特实际上也起到了一个秘密分享的作用。对门$(a,b,c)$来说，设真值分别是$(z_a,z_b,z_c)$，garbler拥有$(\lambda_a,\lambda_b,\lambda_c)$，而evaluator拥有$(\hat{z_a},\hat{z_b},\hat{z_c})=(z_a\oplus \lambda_a,z_b\oplus \lambda_b,z_c\oplus \lambda_c)$，恰好是一个加法分享。
+
+%我们来看一下这个加法分享是怎么生成的，其实是使用OT。只考虑label的最后一个比特(置换比特)，在garbler生成输入门的label时，最后一个比特其实是$(\lambda_a,\lambda_a\oplus 1)$，而evaluator的选择比特是$z_a$，因此evaluator就得到了$\lambda_a\oplus z_a$。这里的思想和用4选1OT做GMW乘法是类似的。
+
+接下来garbler要做的就是如何让evaluator求值的时候得到对应的输出分享，我们来看一下现在双方都有什么。对乘法门$(a,b,c)$，garbler有输入线的分享$\lambda_a,\lambda_b$和输出线的分享$\lambda_c$，evaluator有输入线的分享$\hat{z_a}=z_a\oplus \lambda_a,\hat{z_b}=z_b\oplus \lambda_b$，目标是让evaluator得到输出线的分享$\hat{z_c}=z_c\oplus \lambda_c$
+
+这里其实用的就是一个GMW协议中4选1OT做乘法的思路，garbled table的四行密文其实恰恰对应了OT的四条消息，能够让evaluator求出对应的输出。
+
+回顾点置换和FreeXOR技术的garbled table：
+
+	$e_{0,0} = H(L_{a,0}||L_{b,0}||g)\oplus L_{c,0}\oplus (\lambda_a\cdot\lambda_b\oplus \lambda_c)\Delta$
+
+    $e_{0,1} =H(L_{a,0}||L_{b,1}||g)\oplus L_{c,0}\oplus (\lambda_a\cdot\overline{\lambda_b}\oplus \lambda_c)\Delta$
+
+    $e_{1,0} = H(L_{a,1}||L_{b,0}||g)\oplus L_{c,0}\oplus (\overline{\lambda_a}\cdot\lambda_b\oplus \lambda_c)\Delta$
+
+    $e_{1,1} = H(L_{a,1}||L_{b,1}||g)\oplus L_{c,0}\oplus (\overline{\lambda_a}\cdot\overline{\lambda_b}\oplus \lambda_c)\Delta$
+
+如果我们用GMW中的符号，$x_1=\lambda_a,y_1=\lambda_b,x_2=\hat{z_z},y_2=\hat{z_b},z_1=\lambda_c$，这时候可以发现，四条密文对应的恰好是4选1OT里的四条消息。由于evaluator只有一组正确的label对，因此只能解密一行，就是对应$z_2=\hat{z_c}$那一行。满足$z_1\oplus z_2=(x_1\oplus x_2)(y_1\oplus y_2)$。
+
+个人的理解：从这个角度看，GC和GMW做乘法的想法是类似的，但是为什么GC可以做到常数轮，而GMW的轮数和乘法深度有关呢？我认为是GC是做了一个轮数和通信的trade-off，即通过大量增加通信换取了常数轮数。在GMW中，每次做乘法其实只需要把真值对应的那一条消息发过去就行了，使用OT extension技术，用OT传一个比特平均通信就是$O(1)$。而GC则需要一次性把所有可能的消息遍历一遍都发过去。而为了防止泄露额外信息，那些非真值的消息要用加密掩盖，而这就导致密文的长度至少是安全参数$O(\kappa)$，即传一个比特要通信$O(\kappa)$。
+	\bibliography{MPC}
+	
+	
+	
+	
+	
+	
+\end{document}
